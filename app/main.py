@@ -48,8 +48,6 @@ my_post = [{
             }
            ]
 
-
-
 app = FastAPI()
 
 @app.get("/")
@@ -70,7 +68,6 @@ async def getposts():
     return {"data":posts}
 
 
-
 @app.post("/create", status_code=status.HTTP_201_CREATED)
 async def create_post(post: Post):
     """Endpoint to create a post."""
@@ -88,39 +85,54 @@ async def create_post(post: Post):
 @app.get("/posts/{post_id}")
 async def get_post(post_id: int):
     """Endpoint to retrieve a post by its ID."""
-    for post in my_post:
-        if post['id'] == post_id:
+    with psycopg.connect(dbname="fastapiDb", user="postgres", password="Dyslpostgres") as db_conn:
+        with db_conn.cursor() as cur:
+            cur.execute("""SELECT * FROM public."Posts" WHERE "Id" = %s """, (str(post_id),))
+            post = cur.fetchone()
+            if not post :
+                raise HTTPException(
+                    status_code=status.HTTP_404_NOT_FOUND,
+                    detail="Post not found"
+                )
             return {"data": post}
-    raise HTTPException(
-        status_code=status.HTTP_404_NOT_FOUND,
-        detail="Post not found"
-    )
     # response.status_code = status.HTTP_404_NOT_FOUND
     # return {"error": "Post not found"}, 404
+
 
 @app.delete("/posts/{post_id}", status_code=status.HTTP_204_NO_CONTENT)
 async def delete_post(post_id: int):
     """Endpoint to delete a post by its ID."""
-    for index, post in enumerate(my_post):
-        if post['id'] == post_id:
-            del my_post[index]
-            return Response(status_code=status.HTTP_204_NO_CONTENT)
-    raise HTTPException(
-        status_code=status.HTTP_404_NOT_FOUND,
-        detail="Post not found"
-    )
+    with psycopg.connect(dbname="fastapiDb", user="postgres", password="Dyslpostgres") as db_conn:
+        with db_conn.cursor() as cur:
+            cur.execute("""DELETE FROM public."Posts" WHERE "Id" = %s RETURNING *""", (str(post_id),))
+            del_post = cur.fetchone()
+            db_conn.commit()
+            if not del_post:
+                raise HTTPException(
+                    status_code=status.HTTP_404_NOT_FOUND,
+                    detail="Post not found"
+                )
+            return {"data": del_post}
+
 
 @app.put("/posts/{post_id}")
 async def update_post(post_id: int, post: Post):
     """Endpoint to update a post by its ID."""
-    for index, existing_post in enumerate(my_post):
-        if existing_post['id'] == post_id:
-            updated_post = post.model_dump()
-            updated_post['id'] = post_id
-            my_post[index] = updated_post
+    likes = post.likes if post.likes is not None else randrange(0, 10000)
+    with psycopg.connect(dbname="fastapiDb", user="postgres", password="Dyslpostgres") as db_conn:
+        with db_conn.cursor() as cur:
+            cur.execute("""UPDATE public."Posts" 
+                        SET "Title" = %s, "Content" = %s, "Published" = %s, "Likes" = %s
+                        WHERE "Id" = %s
+                        RETURNING *""", (post.title, post.content, post.published, likes, str(post_id))
+                        )
+            updated_post = cur.fetchone()
+            db_conn.commit()
+
+            if update_post is None:
+                raise HTTPException(
+                    status_code=status.HTTP_404_NOT_FOUND,
+                    detail="Post not found"
+                )
             return {"data": updated_post}
-    raise HTTPException(
-        status_code=status.HTTP_404_NOT_FOUND,
-        detail="Post not found"
-    )
 
