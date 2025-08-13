@@ -1,13 +1,18 @@
 """Module providing a function printing python version."""
 
+from typing import Annotated, Optional
 from datetime import datetime
-from typing import Optional
 from random import randrange
+from contextlib import asynccontextmanager
 import psycopg
 from psycopg.rows import dict_row
-from fastapi import FastAPI, Response, status, HTTPException
+from fastapi import FastAPI, Response, status, HTTPException, Depends
 # import fastapi.params as params
 from pydantic import BaseModel
+from . import models
+from .database import engine, get_session, create_db_and_tables
+from sqlmodel import SQLModel, Field, Session, create_engine, select
+
 
 
 
@@ -48,12 +53,32 @@ my_post = [{
             }
            ]
 
-app = FastAPI()
+
+SessionDep = Annotated[Session, Depends(get_session)]
+
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    """Lifespan event handler to create database tables."""
+    create_db_and_tables()
+    yield
+    # Cleanup actions can be added here if needed
+
+app = FastAPI(lifespan=lifespan)
+
 
 @app.get("/")
 async def root():
     """Root endpoint that returns a simple greeting message."""
     return {"message": "Hello"}
+
+
+@app.get("/sqlmodel")
+async def test_posts(session: SessionDep):
+    """Endpoint to test SQLModel posts."""
+    statement = select(models.Post)
+    results = session.exec(statement).all()
+    return {"data": results}
 
 
 @app.get("/posts")
