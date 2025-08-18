@@ -23,6 +23,8 @@ class Post(SQLModel, table=True):
         sa_column=Column(
             DateTime, nullable=True, server_default=text("(now() AT TIME ZONE 'UTC')")))
     Likes: int = Field(default=randrange(0, 10000), nullable=True)
+    # user_id: int = Field(foreign_key="Users.Id", nullable=False)
+    # User: "User" = Relationship(back_populates="Posts")
 
 
 class User(SQLModel, table=True):
@@ -37,5 +39,6 @@ class User(SQLModel, table=True):
         sa_column=Column(DateTime,
                             nullable=True,
                             server_default=text("(now() AT TIME ZONE 'UTC')")))
-    Posts: list[Post] = Relationship(back_populates ="user")
+    # Posts: list[Post] = Relationship(back_populates ="User")
+    
 
